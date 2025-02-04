@@ -32,111 +32,61 @@ async function connectDB() {
     }
 }
 
-// 📩 Fonction d'envoi de message
-async function sendNotification(userId) {
+// 🔍 Vérifier les demandes en attente pour un utilisateur
+async function checkUserPendingRequest(userId) {
     try {
-        const message = `🚀 Félicitations, votre accès est presque validé!  
+        // Récupérer les demandes en attente pour le canal
+        const pendingRequests = await bot.getChatJoinRequests(channelId);
 
-🔥 Vous êtes sur le point de rejoindre un cercle ultra privé réservé aux esprits ambitieux, prêts à transformer leur avenir.
+        // Vérifier si l'utilisateur a une demande en attente
+        const userHasPendingRequest = pendingRequests.some(request => request.user.id === userId);
 
-👉⚠️ Attention : Pour finaliser votre adhésion et débloquer l'accès à notre communauté privée, veuillez confirmer votre présence en rejoignant les canaux ci-dessous.
-
-⏳ Temps limité : Vous avez 10 minutes pour rejoindre les canaux ci-dessous. Après ce délai, votre place sera réattribuée à quelqu’un d’autre, et vous perdrez cette opportunité unique.
-
-📢 Canal 1 : [Rejoindre](https://t.me/+2yFwq9WpUrNhNGRk)  
-📢 Canal 2 : [Rejoindre](https://t.me/+tZk7myIIz98yOTZk)`;
-
-        await bot.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
-
-        console.log(`✅ Notification envoyée à ${userId}`);
-        return true;
+        return userHasPendingRequest;
     } catch (error) {
-        console.error(`❌ Erreur d'envoi à ${userId}:`, error.message);
+        console.error(`❌ Erreur lors de la vérification pour l'utilisateur ${userId}:`, error.message);
         return false;
     }
 }
 
-// 📌 Fonction pour approuver les utilisateurs
-async function approveUsers(userIds, channelId) {
-    try {
-        const pendingRequests = await bot.getChatJoinRequests(channelId);
+// ✅ Traiter les utilisateurs du fichier user.json
+async function processUsers() {
+    const db = await connectDB();
+    const collection = db.collection(collectionName);
 
-        if (!pendingRequests.length) {
-            console.log("⛔ Aucune demande en attente !");
-            return;
-        }
+    // Lire les IDs des utilisateurs depuis le fichier user.json
+    const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
 
-        console.log(`🔍 ${pendingRequests.length} demandes trouvées.`);
+    for (const userId of users) {
+        try {
+            // Vérifier si l'utilisateur a une demande en attente
+            const hasPendingRequest = await checkUserPendingRequest(userId);
 
-        const db = await connectDB();
+            if (hasPendingRequest) {
+                // Enregistrer l'utilisateur dans MongoDB
+                await collection.updateOne(
+                    { user_id: userId },
+                    { 
+                        $set: { 
+                            user_id: userId,
+                            status: 'pending',
+                            timestamp: new Date() 
+                        } 
+                    },
+                    { upsert: true }
+                );
 
-        for (let i = 0; i < userIds.length; i += 20) {
-            const batch = userIds.slice(i, i + 20);
-
-            for (const userId of batch) {
-                try {
-                    if (pendingRequests.some(req => req.user_id === userId)) {
-                        await bot.approveChatJoinRequest(channelId, userId);
-                        console.log(`✅ Demande approuvée pour ${userId}`);
-
-                        await bot.sendMessage(userId, `🎯 Accédez maintenant et prenez votre destin en main !`);
-                        
-                        await db.collection(collectionName).updateOne(
-                            { user_id: userId },
-                            { $set: { user_id: userId, status: 'approved', approved_at: new Date() } },
-                            { upsert: true }
-                        );
-                    } else {
-                        console.log(`⚠️ L'utilisateur ${userId} n'a pas de demande en attente.`);
-                    }
-                    
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                } catch (error) {
-                    console.error(`❌ Erreur sur ${userId}:`, error.message);
-                }
+                console.log(`✅ Utilisateur ${userId} a une demande en attente et a été enregistré.`);
+            } else {
+                console.log(`⏩ Utilisateur ${userId} n'a pas de demande en attente. Ignoré.`);
             }
-
-            console.log("⏳ Pause de 10 secondes avant de traiter le prochain lot...");
-            await new Promise(resolve => setTimeout(resolve, 10000));
+        } catch (error) {
+            console.error(`❌ Erreur lors du traitement de l'utilisateur ${userId}:`, error.message);
         }
-
-        console.log("✅ Toutes les demandes ont été traitées !");
-    } catch (error) {
-        console.error("❌ Erreur lors de la récupération des demandes :", error.message);
     }
 }
 
-// ✅ Commande pour accepter tous les anciens utilisateurs
-bot.onText(/\/oldaccepte/, async (msg) => {
-    const userId = msg.from.id;
+// 🕒 Vérifier périodiquement les utilisateurs
+setInterval(processUsers, 60000); // Toutes les 60 secondes
 
-    if (userId !== 1613186921) {
-        return bot.sendMessage(userId, "⛔ Vous n'avez pas accès à cette commande.");
-    }
-
-    const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
-    const validUsers = [];
-
-    for (const userId of users) {
-        if (await sendNotification(userId)) {
-            validUsers.push(userId);
-        }
-    }
-
-    console.log(`✅ ${validUsers.length} utilisateurs notifiés.`);
-
-    setTimeout(async () => {
-        await approveUsers(validUsers, channelId);
-    }, 600000); // 10 minutes d’attente avant d'approuver
-});
-
-// 🌍 Serveur keep-alive
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('🤖 Bot opérationnel');
-}).listen(8080, () => {
-    console.log('🌍 Serveur keep-alive actif sur port 8080');
-});
-
-
-
+// 🌍 Démarrer le bot
+console.log('🤖 Bot démarré. Vérification des utilisateurs...');
