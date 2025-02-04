@@ -66,7 +66,7 @@ bot.onText(/\/ajouter_users/, async (msg) => {
         return bot.sendMessage(adminId, "⚠ Aucun utilisateur trouvé dans user.json.");
     }
 
-    const batchSize = 50; // 📌 Taille d'un lot
+    const batchSize = 100; // 📌 Taille d'un lot
     let accepted = 0;
     let failed = 0;
 
