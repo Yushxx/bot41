@@ -16,14 +16,11 @@ const userFile = 'user.json'; // Fichier contenant les IDs
 
 
 
-
-
-
-// 🏗 Initialisation du bot et de MongoDB
+// 🏗 Initialisation
 const bot = new TelegramBot(token, { polling: true });
 const client = new MongoClient(mongoUri);
 
-// 🔗 Connexion à MongoDB
+// 🔗 Connexion MongoDB
 async function connectDB() {
     try {
         await client.connect();
@@ -35,108 +32,111 @@ async function connectDB() {
     }
 }
 
-// 🔄 Fonction pour lire les IDs depuis user.json
-function getUserList() {
+// 📩 Fonction d'envoi de message
+async function sendNotification(userId) {
     try {
-        const data = fs.readFileSync(userFile, 'utf8');
-        return JSON.parse(data);
+        const message = `🚀 Félicitations, votre accès est presque validé!  
+
+🔥 Vous êtes sur le point de rejoindre un cercle ultra privé réservé aux esprits ambitieux, prêts à transformer leur avenir.
+
+👉⚠️ Attention : Pour finaliser votre adhésion et débloquer l'accès à notre communauté privée, veuillez confirmer votre présence en rejoignant les canaux ci-dessous.
+
+⏳ Temps limité : Vous avez 10 minutes pour rejoindre les canaux ci-dessous. Après ce délai, votre place sera réattribuée à quelqu’un d’autre, et vous perdrez cette opportunité unique.
+
+📢 Canal 1 : [Rejoindre](https://t.me/+2yFwq9WpUrNhNGRk)  
+📢 Canal 2 : [Rejoindre](https://t.me/+tZk7myIIz98yOTZk)`;
+
+        await bot.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+
+        console.log(`✅ Notification envoyée à ${userId}`);
+        return true;
     } catch (error) {
-        console.error('❌ Erreur de lecture du fichier user.json:', error.message);
-        return [];
+        console.error(`❌ Erreur d'envoi à ${userId}:`, error.message);
+        return false;
     }
 }
 
-// ⏳ Fonction pour attendre un certain temps
-function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// 📌 Fonction pour approuver les utilisateurs
+async function approveUsers(userIds, channelId) {
+    try {
+        const pendingRequests = await bot.getChatJoinRequests(channelId);
 
-// ✅ Commande pour ajouter les utilisateurs par batch
-bot.onText(/\/ajouter_users/, async (msg) => {
-    const adminId = msg.from.id;
+        if (!pendingRequests.length) {
+            console.log("⛔ Aucune demande en attente !");
+            return;
+        }
 
-    // Vérifie si c'est l'admin
-    if (adminId !== 1613186921) {
-        return bot.sendMessage(adminId, "⛔ Vous n'avez pas accès à cette commande.");
-    }
+        console.log(`🔍 ${pendingRequests.length} demandes trouvées.`);
 
-    const db = await connectDB();
-    const users = getUserList();
-    if (users.length === 0) {
-        return bot.sendMessage(adminId, "⚠ Aucun utilisateur trouvé dans user.json.");
-    }
+        const db = await connectDB();
 
-    const batchSize = 100; // 📌 Taille d'un lot
-    let accepted = 0;
-    let failed = 0;
+        for (let i = 0; i < userIds.length; i += 20) {
+            const batch = userIds.slice(i, i + 20);
 
-    for (let i = 0; i < users.length; i += batchSize) {
-        const batch = users.slice(i, i + batchSize);
-        console.log(`🔄 Traitement du lot ${i / batchSize + 1}/${Math.ceil(users.length / batchSize)}...`);
+            for (const userId of batch) {
+                try {
+                    if (pendingRequests.some(req => req.user_id === userId)) {
+                        await bot.approveChatJoinRequest(channelId, userId);
+                        console.log(`✅ Demande approuvée pour ${userId}`);
 
-        // 📌 Traiter tous les users du batch en parallèle
-        await Promise.all(batch.map(async (userId) => {
-            try {
-                // 1️⃣ Notifier l'utilisateur
-                const messageNotification = `🚀 *Félicitations, votre accès est presque validé!*  
-
-🔥 *Vous êtes sur le point de rejoindre un cercle ultra privé réservé aux esprits ambitieux, prêts à transformer leur avenir.*  
-
-👉⚠️ *Attention* : Pour finaliser votre adhésion et débloquer l'accès à notre communauté privée, veuillez confirmer votre présence en rejoignant les canaux ci-dessous.  
-
-⏳ *Temps limité* : Vous avez *10 minutes* pour rejoindre les canaux ci-dessous. Après ce délai, votre place sera réattribuée à quelqu’un d’autre, et vous perdrez cette opportunité unique.  
-
-📌 Canal 1 : [🔥 Rejoindre](https://t.me/+2yFwq9WpUrNhNGRk)  
-📌 Canal 2 : [🚀 Rejoindre](https://t.me/+tZk7myIIz98yOTZk)`;
-
-                await bot.sendMessage(userId, messageNotification, { parse_mode: 'Markdown', disable_web_page_preview: true });
-
-                // 2️⃣ Sauvegarder dans MongoDB
-                await db.collection(collectionName).updateOne(
-                    { user_id: userId },
-                    { $set: { user_id: userId, status: 'notified', timestamp: new Date() } },
-                    { upsert: true }
-                );
-
-                // 3️⃣ Approuver la demande
-                await bot.approveChatJoinRequest(channelId, userId);
-
-                // 4️⃣ Mettre à jour MongoDB
-                await db.collection(collectionName).updateOne(
-                    { user_id: userId },
-                    { $set: { status: 'approved', approved_at: new Date() } }
-                );
-
-                // 5️⃣ Confirmer à l'utilisateur
-                const messageConfirmation = `🎯 *Accédez maintenant et prenez votre destin en main !*`;
-
-                await bot.sendMessage(userId, messageConfirmation, { parse_mode: 'Markdown' });
-
-                accepted++;
-            } catch (error) {
-                console.error(`❌ Erreur avec ${userId}:`, error.message);
-                failed++;
+                        await bot.sendMessage(userId, `🎯 Accédez maintenant et prenez votre destin en main !`);
+                        
+                        await db.collection(collectionName).updateOne(
+                            { user_id: userId },
+                            { $set: { user_id: userId, status: 'approved', approved_at: new Date() } },
+                            { upsert: true }
+                        );
+                    } else {
+                        console.log(`⚠️ L'utilisateur ${userId} n'a pas de demande en attente.`);
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } catch (error) {
+                    console.error(`❌ Erreur sur ${userId}:`, error.message);
+                }
             }
-        }));
 
-        // ⏳ Pause entre chaque lot pour éviter le spam
-        console.log(`✅ Lot terminé. Pause de 5 secondes...`);
-        await wait(5000);
+            console.log("⏳ Pause de 10 secondes avant de traiter le prochain lot...");
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+
+        console.log("✅ Toutes les demandes ont été traitées !");
+    } catch (error) {
+        console.error("❌ Erreur lors de la récupération des demandes :", error.message);
+    }
+}
+
+// ✅ Commande pour accepter tous les anciens utilisateurs
+bot.onText(/\/oldaccepte/, async (msg) => {
+    const userId = msg.from.id;
+
+    if (userId !== 1613186921) {
+        return bot.sendMessage(userId, "⛔ Vous n'avez pas accès à cette commande.");
     }
 
-    // 🏁 Résumé final
-    bot.sendMessage(adminId, `📊 Résumé : ${accepted} acceptés, ${failed} refusés.`);
+    const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
+    const validUsers = [];
+
+    for (const userId of users) {
+        if (await sendNotification(userId)) {
+            validUsers.push(userId);
+        }
+    }
+
+    console.log(`✅ ${validUsers.length} utilisateurs notifiés.`);
+
+    setTimeout(async () => {
+        await approveUsers(validUsers, channelId);
+    }, 600000); // 10 minutes d’attente avant d'approuver
 });
 
-// 🌍 Serveur keep-alive pour éviter l'arrêt du bot
+// 🌍 Serveur keep-alive
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('🤖 Bot opérationnel');
 }).listen(8080, () => {
     console.log('🌍 Serveur keep-alive actif sur port 8080');
 });
-
-
 
 
 
