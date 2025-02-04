@@ -6,7 +6,7 @@ const http = require('http');
 
 // ⚙️ Configuration
 const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par ton token de bot
-const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par ton URI MongoDB
+ // Remplace par ton URI MongoDB
 const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 
 
@@ -18,95 +18,59 @@ const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 
 
 
-const dbName = 'telegramBotDB';
-const collectionName = 'usenrVF';
-const userFile = 'user.json'; // Fichier contenant les IDs des utilisateurs
 
-// 🏗 Initialisation
+const userFile = 'user.json'; // Fichier contenant les IDs
+
+// 🏗 Initialisation du bot
 const bot = new TelegramBot(token, { polling: true });
-const client = new MongoClient(mongoUri);
 
-// 🔗 Connexion MongoDB
-async function connectDB() {
+// 🔄 Fonction pour lire le fichier JSON des utilisateurs
+function getUserList() {
     try {
-        await client.connect();
-        console.log('✅ Connecté à MongoDB');
-        return client.db(dbName);
+        const data = fs.readFileSync(userFile, 'utf8');
+        return JSON.parse(data);
     } catch (error) {
-        console.error('❌ Erreur MongoDB:', error);
-        process.exit(1);
+        console.error('❌ Erreur de lecture du fichier user.json:', error.message);
+        return [];
     }
 }
 
-// 📩 Fonction de notification en DM
-async function notifyUser(userId) {
-    try {
-        const message = `🎉 Félicitations ! Vous avez été ajouté au canal VIP.`;
-        await bot.sendMessage(userId, message);
-        console.log(`✅ Notification envoyée à l'utilisateur ${userId}`);
-        return true;
-    } catch (error) {
-        console.error(`❌ Impossible de notifier l'utilisateur ${userId}:`, error.message);
-        return false;
-    }
-}
+// ✅ Commande pour ajouter les utilisateurs
+bot.onText(/\/ajouter_users/, async (msg) => {
+    const userId = msg.from.id;
 
-// ✅ Commande /add pour traiter les utilisateurs
-bot.onText(/\/add/, async (msg) => {
-    const adminId = msg.from.id;
-
-    // Vérification admin
-    if (adminId !== 1613186921) {
-        return bot.sendMessage(adminId, "⛔ Accès refusé !");
+    // Vérifie si c'est l'admin
+    if (userId !== 1613186921) {
+        return bot.sendMessage(userId, "⛔ Vous n'avez pas accès à cette commande.");
     }
 
-    const db = await connectDB();
-    const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
+    const users = getUserList();
+    if (users.length === 0) {
+        return bot.sendMessage(userId, "⚠ Aucun utilisateur trouvé dans user.json.");
+    }
 
-    let successCount = 0;
-    let errorCount = 0;
+    let accepted = 0;
+    let failed = 0;
 
-    for (const userId of users) {
+    for (const id of users) {
         try {
-            // Essayer d'ajouter l'utilisateur au canal
-            await bot.approveChatJoinRequest(channelId, userId);
-
-            // Notifier l'utilisateur en DM
-            await notifyUser(userId);
-
-            // Mettre à jour MongoDB
-            await db.collection(collectionName).updateOne(
-                { user_id: userId },
-                { 
-                    $set: { 
-                        user_id: userId,
-                        status: 'approved',
-                        timestamp: new Date() 
-                    } 
-                },
-                { upsert: true }
-            );
-
-            console.log(`✅ ${userId} ajouté et notifié`);
-            successCount++;
+            await bot.approveChatJoinRequest(channelId, id);
+            await bot.sendMessage(userId, `✅ Utilisateur ${id} accepté.`);
+            accepted++;
         } catch (error) {
-            console.error(`❌ Échec pour ${userId}:`, error.message);
-            errorCount++;
+            await bot.sendMessage(userId, `❌ Utilisateur ${id} n'a pas de demande.`);
+            failed++;
         }
     }
 
-    // Rapport final à l'admin
-    await bot.sendMessage(
-        adminId,
-        `📊 Résultat final :\n\n` +
-        `✅ ${successCount} utilisateurs ajoutés et notifiés\n` +
-        `❌ ${errorCount} utilisateurs ignorés`
-    );
+    bot.sendMessage(userId, `📊 Résumé : ${accepted} acceptés, ${failed} refusés.`);
 });
 
-// 🌍 Serveur keep-alive
+// 🌍 Serveur keep-alive pour éviter l'arrêt du bot
 http.createServer((req, res) => {
-    res.end('🤖 Bot actif');
-}).listen(8080);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('🤖 Bot opérationnel');
+}).listen(8080, () => {
+    console.log('🌍 Serveur keep-alive actif sur port 8080');
+});
 
-console.log('🚀 Bot démarré !');
