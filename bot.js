@@ -5,24 +5,17 @@ const fs = require('fs');
 const http = require('http');
 
 
-
-
-
-
-
-
-
-
-
-
-
 // ⚙️ Configuration
 const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par ton token
 const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
-const collectionName = 'userkVF'; // Collection MongoDB
+const collectionName = 'userold'; // Collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs
+
+
+
+
 
 // 🏗 Initialisation du bot et de MongoDB
 const bot = new TelegramBot(token, { polling: true });
@@ -51,7 +44,12 @@ function getUserList() {
     }
 }
 
-// ✅ Commande pour ajouter les utilisateurs avec notification + DB
+// ⏳ Fonction pour attendre un certain temps
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ✅ Commande pour ajouter les utilisateurs par batch
 bot.onText(/\/ajouter_users/, async (msg) => {
     const adminId = msg.from.id;
 
@@ -66,44 +64,52 @@ bot.onText(/\/ajouter_users/, async (msg) => {
         return bot.sendMessage(adminId, "⚠ Aucun utilisateur trouvé dans user.json.");
     }
 
+    const batchSize = 50; // 📌 Taille d'un lot
     let accepted = 0;
     let failed = 0;
 
-    for (const userId of users) {
-        try {
-            // 1️⃣ Notifier l'utilisateur
-            await bot.sendMessage(userId, "🚀 *Félicitations !* Votre accès est en cours de validation. ⏳", { parse_mode: 'Markdown' });
+    for (let i = 0; i < users.length; i += batchSize) {
+        const batch = users.slice(i, i + batchSize);
+        console.log(`🔄 Traitement du lot ${i / batchSize + 1}/${Math.ceil(users.length / batchSize)}...`);
 
-            // 2️⃣ Sauvegarder l'utilisateur dans MongoDB
-            await db.collection(collectionName).updateOne(
-                { user_id: userId },
-                { $set: { user_id: userId, status: 'notified', timestamp: new Date() } },
-                { upsert: true }
-            );
+        // 📌 Traiter tous les users du batch en parallèle
+        await Promise.all(batch.map(async (userId) => {
+            try {
+                // 1️⃣ Notifier l'utilisateur
+                await bot.sendMessage(userId, "🚀 *Félicitations !* Votre accès est en cours de validation. ⏳", { parse_mode: 'Markdown' });
 
-            // 3️⃣ Attendre 3 secondes avant d'approuver
-            await new Promise(resolve => setTimeout(resolve, 3000));
+                // 2️⃣ Sauvegarder dans MongoDB
+                await db.collection(collectionName).updateOne(
+                    { user_id: userId },
+                    { $set: { user_id: userId, status: 'notified', timestamp: new Date() } },
+                    { upsert: true }
+                );
 
-            // 4️⃣ Approuver la demande d'adhésion
-            await bot.approveChatJoinRequest(channelId, userId);
+                // 3️⃣ Approuver la demande
+                await bot.approveChatJoinRequest(channelId, userId);
 
-            // 5️⃣ Mettre à jour le statut dans MongoDB
-            await db.collection(collectionName).updateOne(
-                { user_id: userId },
-                { $set: { status: 'approved', approved_at: new Date() } }
-            );
+                // 4️⃣ Mettre à jour MongoDB
+                await db.collection(collectionName).updateOne(
+                    { user_id: userId },
+                    { $set: { status: 'approved', approved_at: new Date() } }
+                );
 
-            // 6️⃣ Confirmer l'approbation à l'utilisateur
-            await bot.sendMessage(userId, "✅ *Vous avez été accepté dans le canal !* Bienvenue 🎉", { parse_mode: 'Markdown' });
+                // 5️⃣ Confirmer à l'utilisateur
+                await bot.sendMessage(userId, "✅ *Vous avez été accepté dans le canal !* Bienvenue 🎉", { parse_mode: 'Markdown' });
 
-            await bot.sendMessage(adminId, `✅ Utilisateur ${userId} accepté et ajouté en DB.`);
-            accepted++;
-        } catch (error) {
-            await bot.sendMessage(adminId, `❌ Utilisateur ${userId} n'a pas de demande.`);
-            failed++;
-        }
+                accepted++;
+            } catch (error) {
+                console.error(`❌ Erreur avec ${userId}:`, error.message);
+                failed++;
+            }
+        }));
+
+        // ⏳ Pause entre chaque lot pour éviter le spam
+        console.log(`✅ Lot terminé. Pause de 5 secondes...`);
+        await wait(5000);
     }
 
+    // 🏁 Résumé final
     bot.sendMessage(adminId, `📊 Résumé : ${accepted} acceptés, ${failed} refusés.`);
 });
 
@@ -114,3 +120,8 @@ http.createServer((req, res) => {
 }).listen(8080, () => {
     console.log('🌍 Serveur keep-alive actif sur port 8080');
 });
+
+
+
+
+
