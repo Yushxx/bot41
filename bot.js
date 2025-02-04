@@ -10,8 +10,10 @@ const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par 
 const channelId = '-1002017559099'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
-const collectionName = 'useratomy'; // Collection MongoDB
+const collectionName = 'useraomy'; // Collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs
+
+
 
 
 
@@ -56,6 +58,9 @@ async function processUsers() {
     // Lire les IDs des utilisateurs depuis le fichier user.json
     const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
 
+    let pendingCount = 0;
+    let ignoredCount = 0;
+
     for (const userId of users) {
         try {
             // Vérifier si l'utilisateur a une demande en attente
@@ -76,17 +81,42 @@ async function processUsers() {
                 );
 
                 console.log(`✅ Utilisateur ${userId} a une demande en attente et a été enregistré.`);
+                pendingCount++;
             } else {
                 console.log(`⏩ Utilisateur ${userId} n'a pas de demande en attente. Ignoré.`);
+                ignoredCount++;
             }
         } catch (error) {
             console.error(`❌ Erreur lors du traitement de l'utilisateur ${userId}:`, error.message);
         }
     }
+
+    // Retourner les résultats
+    return { pendingCount, ignoredCount };
 }
 
-// 🕒 Vérifier périodiquement les utilisateurs
-setInterval(processUsers, 60000); // Toutes les 60 secondes
+// 🎛 Commande /startcheck pour démarrer la vérification
+bot.onText(/\/startcheck/, async (msg) => {
+    const chatId = msg.chat.id;
+
+    // Vérifier si c'est l'admin
+    if (msg.from.id !== 1613186921) {
+        return bot.sendMessage(chatId, "⛔ Vous n'avez pas la permission d'utiliser cette commande.");
+    }
+
+    // Démarrer la vérification
+    bot.sendMessage(chatId, "🔍 Démarrage de la vérification des utilisateurs...");
+
+    const { pendingCount, ignoredCount } = await processUsers();
+
+    // Envoyer un rapport à l'admin
+    bot.sendMessage(
+        chatId,
+        `📊 Résultat de la vérification :\n\n` +
+        `✅ ${pendingCount} utilisateurs avec une demande en attente enregistrés.\n` +
+        `⏩ ${ignoredCount} utilisateurs ignorés (pas de demande en attente).`
+    );
+});
 
 // 🌍 Démarrer le bot
-console.log('🤖 Bot démarré. Vérification des utilisateurs...');
+console.log('🤖 Bot démarré. En attente de la commande /startcheck...');
