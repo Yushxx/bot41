@@ -16,9 +16,11 @@ const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 
 
 
+
+
 const dbName = 'telegramBotDB';
-const collectionName = 'userVF';
-const userFile = 'user.json';
+const collectionName = 'usenrVF';
+const userFile = 'user.json'; // Fichier contenant les IDs des utilisateurs
 
 // 🏗 Initialisation
 const bot = new TelegramBot(token, { polling: true });
@@ -36,8 +38,21 @@ async function connectDB() {
     }
 }
 
-// ✅ Commande /accept pour approuver directement
-bot.onText(/\/accept/, async (msg) => {
+// 📩 Fonction de notification en DM
+async function notifyUser(userId) {
+    try {
+        const message = `🎉 Félicitations ! Vous avez été ajouté au canal VIP.`;
+        await bot.sendMessage(userId, message);
+        console.log(`✅ Notification envoyée à l'utilisateur ${userId}`);
+        return true;
+    } catch (error) {
+        console.error(`❌ Impossible de notifier l'utilisateur ${userId}:`, error.message);
+        return false;
+    }
+}
+
+// ✅ Commande /add pour traiter les utilisateurs
+bot.onText(/\/add/, async (msg) => {
     const adminId = msg.from.id;
 
     // Vérification admin
@@ -47,42 +62,45 @@ bot.onText(/\/accept/, async (msg) => {
 
     const db = await connectDB();
     const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
-    
+
     let successCount = 0;
     let errorCount = 0;
 
     for (const userId of users) {
         try {
-            // Approuver directement dans le canal
+            // Essayer d'ajouter l'utilisateur au canal
             await bot.approveChatJoinRequest(channelId, userId);
-            
+
+            // Notifier l'utilisateur en DM
+            await notifyUser(userId);
+
             // Mettre à jour MongoDB
             await db.collection(collectionName).updateOne(
                 { user_id: userId },
                 { 
                     $set: { 
+                        user_id: userId,
                         status: 'approved',
-                        approved_at: new Date(),
                         timestamp: new Date() 
                     } 
                 },
                 { upsert: true }
             );
-            
-            console.log(`✅ ${userId} approuvé avec succès`);
+
+            console.log(`✅ ${userId} ajouté et notifié`);
             successCount++;
         } catch (error) {
-            console.error(`❌ Erreur avec ${userId}:`, error.message);
+            console.error(`❌ Échec pour ${userId}:`, error.message);
             errorCount++;
         }
     }
 
-    // Rapport final
+    // Rapport final à l'admin
     await bot.sendMessage(
         adminId,
         `📊 Résultat final :\n\n` +
-        `✅ ${successCount} utilisateurs approuvés\n` +
-        `❌ ${errorCount} échecs`
+        `✅ ${successCount} utilisateurs ajoutés et notifiés\n` +
+        `❌ ${errorCount} utilisateurs ignorés`
     );
 });
 
