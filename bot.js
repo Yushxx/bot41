@@ -17,8 +17,6 @@ const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 
 
 
-
-
 const dbName = 'telegramBotDB'; // Nom de la base de données
 const collectionName = 'userVF'; // Nom de la collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs des utilisateurs
@@ -125,4 +123,5 @@ http.createServer((req, res) => {
 }).listen(8080, () => {
     console.log('🌍 Serveur keep-alive actif sur port 8080');
 });
+
 
