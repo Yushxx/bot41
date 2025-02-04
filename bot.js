@@ -10,7 +10,7 @@ const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par 
 const channelId = '-1002017559099'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
-const collectionName = 'useraomy'; // Collection MongoDB
+const collectionName = 'userLomy'; // Collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs
 
 
@@ -27,96 +27,56 @@ async function connectDB() {
     try {
         await client.connect();
         console.log('✅ Connecté à MongoDB');
-        return client.db(dbName);
+        return client.db('telegramBotDB');
     } catch (error) {
         console.error('❌ Erreur MongoDB:', error);
         process.exit(1);
     }
 }
 
-// 🔍 Vérifier les demandes en attente pour un utilisateur
-async function checkUserPendingRequest(userId) {
+// 📌 Vérification des demandes d'adhésion
+async function checkJoinRequest(userId) {
     try {
-        // Récupérer les demandes en attente pour le canal
         const pendingRequests = await bot.getChatJoinRequests(channelId);
-
-        // Vérifier si l'utilisateur a une demande en attente
-        const userHasPendingRequest = pendingRequests.some(request => request.user.id === userId);
-
-        return userHasPendingRequest;
+        return pendingRequests.some(req => req.user_id === userId);
     } catch (error) {
-        console.error(`❌ Erreur lors de la vérification pour l'utilisateur ${userId}:`, error.message);
+        console.error('❌ Erreur lors de la vérification des demandes:', error.message);
         return false;
     }
 }
 
-// ✅ Traiter les utilisateurs du fichier user.json
-async function processUsers() {
+// ✅ Vérification pour TOUS les utilisateurs de user.json
+async function checkAllUsers() {
     const db = await connectDB();
-    const collection = db.collection(collectionName);
-
-    // Lire les IDs des utilisateurs depuis le fichier user.json
     const users = JSON.parse(fs.readFileSync(userFile, "utf8"));
-
-    let pendingCount = 0;
-    let ignoredCount = 0;
+    let validUsers = [];
 
     for (const userId of users) {
-        try {
-            // Vérifier si l'utilisateur a une demande en attente
-            const hasPendingRequest = await checkUserPendingRequest(userId);
-
-            if (hasPendingRequest) {
-                // Enregistrer l'utilisateur dans MongoDB
-                await collection.updateOne(
-                    { user_id: userId },
-                    { 
-                        $set: { 
-                            user_id: userId,
-                            status: 'pending',
-                            timestamp: new Date() 
-                        } 
-                    },
-                    { upsert: true }
-                );
-
-                console.log(`✅ Utilisateur ${userId} a une demande en attente et a été enregistré.`);
-                pendingCount++;
-            } else {
-                console.log(`⏩ Utilisateur ${userId} n'a pas de demande en attente. Ignoré.`);
-                ignoredCount++;
-            }
-        } catch (error) {
-            console.error(`❌ Erreur lors du traitement de l'utilisateur ${userId}:`, error.message);
+        if (await checkJoinRequest(userId)) {
+            await db.collection('userVF').updateOne(
+                { user_id: userId },
+                { $set: { user_id: userId, status: 'pending', timestamp: new Date() } },
+                { upsert: true }
+            );
+            validUsers.push(userId);
         }
     }
 
-    // Retourner les résultats
-    return { pendingCount, ignoredCount };
+    console.log(`✅ ${validUsers.length} utilisateurs ont une demande en attente et sont enregistrés.`);
 }
 
-// 🎛 Commande /startcheck pour démarrer la vérification
-bot.onText(/\/startcheck/, async (msg) => {
-    const chatId = msg.chat.id;
+// ✅ Commande pour vérifier les utilisateurs du fichier
+bot.onText(/\/check_all/, async (msg) => {
+    const userId = msg.from.id;
 
-    // Vérifier si c'est l'admin
-    if (msg.from.id !== 1613186921) {
-        return bot.sendMessage(chatId, "⛔ Vous n'avez pas la permission d'utiliser cette commande.");
+    // Vérifier si l'utilisateur est administrateur
+    if (userId !== 1613186921) {
+        return bot.sendMessage(userId, "⛔ Vous n'avez pas accès à cette commande.");
     }
 
-    // Démarrer la vérification
-    bot.sendMessage(chatId, "🔍 Démarrage de la vérification des utilisateurs...");
-
-    const { pendingCount, ignoredCount } = await processUsers();
-
-    // Envoyer un rapport à l'admin
-    bot.sendMessage(
-        chatId,
-        `📊 Résultat de la vérification :\n\n` +
-        `✅ ${pendingCount} utilisateurs avec une demande en attente enregistrés.\n` +
-        `⏩ ${ignoredCount} utilisateurs ignorés (pas de demande en attente).`
-    );
+    await checkAllUsers();
+    bot.sendMessage(userId, "✅ Vérification terminée. Consultez la console.");
 });
 
-// 🌍 Démarrer le bot
-console.log('🤖 Bot démarré. En attente de la commande /startcheck...');
+// 🌍 Lancement du bot
+console.log('🤖 Bot en cours d\'exécution...');
