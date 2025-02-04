@@ -53,64 +53,66 @@ function readUserIDs() {
     }
 }
 
-// 🏁 Commande /oldaccepte pour valider les anciennes demandes
-bot.onText(/\/oldaccepte/, async (msg) => {
-    const userId = msg.from.id;
-    const db = await connectDB();
 
-    // Vérifier si l'utilisateur est admin
-    const adminId = 1613186921;
-    if (userId !== adminId) {
-        return bot.sendMessage(userId, "⛔ Vous n'avez pas l'autorisation d'utiliser cette commande.");
+
+
+
+
+
+
+
+// Commande pour approuver en masse les utilisateurs de user.json
+bot.onText(/\/oldaccepte/, async (msg) => {
+    if (msg.from.id !== adminId) return bot.sendMessage(msg.chat.id, "⛔ Accès refusé.");
+
+    let users;
+    try {
+        // Lire la liste des utilisateurs
+        users = JSON.parse(fs.readFileSync('user.json', 'utf8'));
+        if (!Array.isArray(users) || users.length === 0) {
+            return bot.sendMessage(msg.chat.id, "⚠ Aucun utilisateur éligible à accepter.");
+        }
+    } catch (error) {
+        console.error("❌ Erreur lecture user.json :", error);
+        return bot.sendMessage(msg.chat.id, "🚨 Erreur lors de la lecture du fichier utilisateurs.");
     }
 
-    bot.sendMessage(userId, "🔄 Vérification des utilisateurs...");
-
-    const users = readUserIDs();
     let validUsers = [];
 
-    for (const user of users) {
-        const userId = user.user_id;
-        const userName = user.username || "Utilisateur inconnu";
-
-        // Essayer d'envoyer un message
-        const success = await sendWelcomeMessage(userId, userName);
-
-        if (success) {
-            // Enregistrer dans MongoDB
+    for (const userId of users) {
+        try {
+            // Tester en envoyant un message
+            await bot.sendMessage(userId, "✅ Test d'accès validé !");
+            
+            // Ajouter l'utilisateur validé à la base de données
+            const db = await connectDB();
             await db.collection(collectionName).updateOne(
                 { user_id: userId },
-                { $set: { username: userName, status: 'pending', timestamp: new Date() } },
+                { $set: { status: 'approved', approved_at: new Date() } },
                 { upsert: true }
             );
 
             validUsers.push(userId);
+            console.log(`🎉 Utilisateur ${userId} validé.`);
+        } catch (error) {
+            console.log(`🚫 Impossible d'envoyer un message à ${userId}, ignoré.`);
         }
     }
 
     if (validUsers.length > 0) {
-        bot.sendMessage(userId, `✅ ${validUsers.length} utilisateurs validés, approbation dans 10 secondes...`);
-
-        // ⏳ Attendre 10 secondes avant approbation
-        setTimeout(async () => {
-            for (const userId of validUsers) {
-                try {
-                    await bot.approveChatJoinRequest(channelId, userId);
-                    console.log(`🎉 Utilisateur ${userId} approuvé avec succès !`);
-
-                    await db.collection(collectionName).updateOne(
-                        { user_id: userId },
-                        { $set: { status: 'approved', approved_at: new Date() } }
-                    );
-                } catch (error) {
-                    console.error(`❌ Erreur lors de l'approbation de ${userId}:`, error.message);
-                }
-            }
-        }, 10000);
+        bot.sendMessage(msg.chat.id, `✅ ${validUsers.length} utilisateurs validés avec succès.`);
     } else {
-        bot.sendMessage(userId, "⚠️ Aucun utilisateur éligible à approuver.");
+        bot.sendMessage(msg.chat.id, "⚠ Aucun utilisateur éligible trouvé.");
     }
 });
+
+
+
+
+
+
+
+
 
 // 🌍 Serveur keep-alive
 http.createServer((req, res) => {
