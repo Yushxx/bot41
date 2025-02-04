@@ -7,7 +7,7 @@ const http = require('http');
 
 // ⚙️ Configuration
 const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par ton token
-const channelId = '-1002017559099'; // Remplace par l'ID de ton canal
+const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
 const collectionName = 'userLomy'; // Collection MongoDB
