@@ -102,7 +102,8 @@ async function sendWelcomeMessage(userId, userName) {
             bot.once('message', async (message) => {
                 const messageId = message.message_id;
                 const chatId = message.chat.id;
-                bot.sendMessage(userId, '✅ Confirmer l'envoi ?', {
+                bot.sendMessage(userId, "✅ Confirmer l'envoi ?", {
+
                     reply_markup: { inline_keyboard: [
                         [{ text: '✔ Oui', callback_data: `confirm_send_${chatId}_${messageId}` }],
                         [{ text: '❌ Non', callback_data: 'cancel_send' }]
