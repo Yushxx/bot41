@@ -1,0 +1,20 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram avec gestion des demandes d'adhésion",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.61.0",
+    "mongodb": "^5.6.0",
+    "fs": "0.0.1-security",
+    "http": "0.0.1-security"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "author": "TonNom",
+  "license": "MIT"
+}
