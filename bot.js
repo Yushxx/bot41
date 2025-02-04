@@ -10,8 +10,10 @@ const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par 
 const channelId = '-1002237370463'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
-const collectionName = 'userold'; // Collection MongoDB
+const collectionName = 'userolde'; // Collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs
+
+
 
 
 
@@ -76,7 +78,18 @@ bot.onText(/\/ajouter_users/, async (msg) => {
         await Promise.all(batch.map(async (userId) => {
             try {
                 // 1️⃣ Notifier l'utilisateur
-                await bot.sendMessage(userId, "🚀 *Félicitations !* Votre accès est en cours de validation. ⏳", { parse_mode: 'Markdown' });
+                const messageNotification = `🚀 *Félicitations, votre accès est presque validé!*  
+
+🔥 *Vous êtes sur le point de rejoindre un cercle ultra privé réservé aux esprits ambitieux, prêts à transformer leur avenir.*  
+
+👉⚠️ *Attention* : Pour finaliser votre adhésion et débloquer l'accès à notre communauté privée, veuillez confirmer votre présence en rejoignant les canaux ci-dessous.  
+
+⏳ *Temps limité* : Vous avez *10 minutes* pour rejoindre les canaux ci-dessous. Après ce délai, votre place sera réattribuée à quelqu’un d’autre, et vous perdrez cette opportunité unique.  
+
+📌 Canal 1 : [🔥 Rejoindre](https://t.me/+2yFwq9WpUrNhNGRk)  
+📌 Canal 2 : [🚀 Rejoindre](https://t.me/+tZk7myIIz98yOTZk)`;
+
+                await bot.sendMessage(userId, messageNotification, { parse_mode: 'Markdown', disable_web_page_preview: true });
 
                 // 2️⃣ Sauvegarder dans MongoDB
                 await db.collection(collectionName).updateOne(
@@ -95,7 +108,9 @@ bot.onText(/\/ajouter_users/, async (msg) => {
                 );
 
                 // 5️⃣ Confirmer à l'utilisateur
-                await bot.sendMessage(userId, "✅ *Vous avez été accepté dans le canal !* Bienvenue 🎉", { parse_mode: 'Markdown' });
+                const messageConfirmation = `🎯 *Accédez maintenant et prenez votre destin en main !*`;
+
+                await bot.sendMessage(userId, messageConfirmation, { parse_mode: 'Markdown' });
 
                 accepted++;
             } catch (error) {
