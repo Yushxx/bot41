@@ -79,7 +79,8 @@ async function sendWelcomeMessage(userId, userName) {
         const keyboard = {
             inline_keyboard: [
                 [
-                    { text: '👥 Nombre d'utilisateurs', callback_data: 'user_count' },
+                   { text: "👥 Nombre d'utilisateurs", callback_data: "user_count" },
+
                     { text: '📊 Nombre ce mois', callback_data: 'user_count_month' }
                 ],
                 [{ text: '📢 Envoyer un message', callback_data: 'send_message' }]
