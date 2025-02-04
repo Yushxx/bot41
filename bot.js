@@ -10,7 +10,7 @@ const token = '8075874480:AAFymYS-clEN1hfdcrV7e0ZfvX9MyQOJngY'; // Remplace par 
 const channelId = '-1002017559099'; // Remplace par l'ID de ton canal
 const mongoUri = 'mongodb+srv://josh:JcipLjQSbhxbruLU@cluster0.hn4lm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'; // Remplace par l'URI de ta base MongoDB
 const dbName = 'telegramBotDB'; // Nom de la base de données
-const collectionName = 'userolde'; // Collection MongoDB
+const collectionName = 'usertomy'; // Collection MongoDB
 const userFile = 'user.json'; // Fichier contenant les IDs
 
 
