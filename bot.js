@@ -4,12 +4,14 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '7822099207:AAGXIYMtIFkOz8p5xCRY3o_K6pK75rxp6Tg';
 const bot = new TelegramBot(token, { polling: true });
 
-// Réagir à un message avec un émoji
 bot.on('message', (msg) => {
+    console.log('Message reçu :', msg.text);
     const chatId = msg.chat.id;
     const messageId = msg.message_id;
 
-    // Réagir avec un émoji 👍
+    console.log('chatId:', chatId);
+    console.log('messageId:', messageId);
+
     bot.setMessageReaction(chatId, messageId, [{ type: 'emoji', emoji: '👍' }])
         .then(() => {
             console.log('Réaction ajoutée avec succès !');
