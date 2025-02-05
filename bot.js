@@ -1,24 +1,24 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Remplace 'TON_TOKEN_BOT' par le token de ton bot
-const token = '7822099207:AAGXIYMtIFkOz8p5xCRY3o_K6pK75rxp6Tg';
-const bot = new TelegramBot(token, { polling: true });
+// Remplace avec ton token bot
+const TOKEN = '7822099207:AAGXIYMtIFkOz8p5xCRY3o_K6pK75rxp6Tg';
 
+// Remplace avec l'ID de ton canal (ex: -1001234567890)
+const CHANNEL_ID = '-100XXXXXXXXXX';
+
+// Initialisation du bot
+const bot = new TelegramBot(TOKEN, { polling: true });
+
+console.log('🤖 Bot lancé et en écoute du canal...');
+
+// Écoute les messages du canal
 bot.on('message', (msg) => {
-    console.log('Message reçu :', msg.text);
-    const chatId = msg.chat.id;
-    const messageId = msg.message_id;
+    if (msg.chat.id.toString() === CHANNEL_ID) {
+        console.log(`📩 Nouveau message du canal : ${msg.text}`);
 
-    console.log('chatId:', chatId);
-    console.log('messageId:', messageId);
-
-    bot.setMessageReaction(chatId, messageId, [{ type: 'emoji', emoji: '👍' }])
-        .then(() => {
-            console.log('Réaction ajoutée avec succès !');
-        })
-        .catch((err) => {
-            console.error('Erreur lors de l\'ajout de la réaction :', err);
-        });
+        // Réponse automatique (personnalise ton message)
+        bot.sendMessage(CHANNEL_ID, "👀 J'ai vu ton message !")
+            .then(() => console.log('✅ Réponse envoyée'))
+            .catch(err => console.error('❌ Erreur d’envoi :', err));
+    }
 });
-
-console.log('Bot en écoute...');
