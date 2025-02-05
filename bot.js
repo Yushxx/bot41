@@ -5,8 +5,6 @@ const TOKEN = '7822099207:AAGXIYMtIFkOz8p5xCRY3o_K6pK75rxp6Tg';
 
 // Remplace avec l'ID de ton canal (ex: -1001234567890)
 const CHANNEL_ID = '-1002237370463';
-const TelegramBot = require('node-telegram-bot-api');
-
 
 
 // Initialisation du bot
